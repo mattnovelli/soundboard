@@ -7,8 +7,8 @@
 #define AUDIO_TIMER_MS 40
 // Bytes written to the speaker per drain tick (1 byte/sample at 8-bit).
 #define AUDIO_SAMPLES_PER_TICK (AUDIO_SAMPLE_RATE * AUDIO_TIMER_MS / 1000) // 320
-// Hard cap on a single clip: 4 seconds @ 8 kHz 8-bit = 32000 bytes.
-#define AUDIO_MAX_PCM_BYTES (AUDIO_SAMPLE_RATE * 4)
+// Hard cap on a single clip: 10 seconds @ 8 kHz 8-bit = 80000 bytes.
+#define AUDIO_MAX_PCM_BYTES (AUDIO_SAMPLE_RATE * 10)
 
 // Speaker volume range. Emery's speaker is loud, so keep the usable range low.
 #define AUDIO_VOLUME_MIN 5
