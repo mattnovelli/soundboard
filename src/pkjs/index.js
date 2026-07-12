@@ -1,4 +1,4 @@
-/* global localStorage, Pebble, atob */
+/* global localStorage, Pebble */
 /* Soundboard PebbleKit JS companion.
  *
  * Responsibilities:
@@ -23,7 +23,7 @@ var KEY_STATUS = 6;
 var KEY_VOLUME = 7;
 
 // TODO: set this to your published GitHub Pages URL (see docs/README.md).
-var CONFIG_PAGE_URL = 'https://YOUR_GITHUB_USERNAME.github.io/soundboard/';
+var CONFIG_PAGE_URL = 'https://mattnovelli.github.io/soundboard/';
 
 // PCM chunk size in bytes. Must fit within the watch inbox (4096) with room
 // for AppMessage overhead.
@@ -103,12 +103,49 @@ function sendError(text) {
 // Streaming PCM to the watch
 // ---------------------------------------------------------------------------
 
+// Base64 decode. PebbleKit JS does not provide atob(), so decode manually.
+var B64_LOOKUP = (function () {
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var table = {};
+  for (var i = 0; i < chars.length; i++) {
+    table[chars.charAt(i)] = i;
+  }
+  return table;
+})();
+
 function b64ToBytes(b64) {
-  var bin = atob(b64);
-  var len = bin.length;
-  var bytes = new Uint8Array(len);
-  for (var i = 0; i < len; i++) {
-    bytes[i] = bin.charCodeAt(i);
+  var clean = String(b64).replace(/[^A-Za-z0-9+/]/g, '');
+  var len = clean.length;
+  var rem = len & 3; // leftover chars after full groups of 4 (0, 2 or 3)
+  var byteLength = (len >> 2) * 3;
+  if (rem === 2) {
+    byteLength += 1;
+  } else if (rem === 3) {
+    byteLength += 2;
+  }
+
+  var bytes = new Uint8Array(byteLength);
+  var p = 0;
+  var i = 0;
+  for (; i + 4 <= len; i += 4) {
+    var n = (B64_LOOKUP[clean.charAt(i)] << 18) |
+            (B64_LOOKUP[clean.charAt(i + 1)] << 12) |
+            (B64_LOOKUP[clean.charAt(i + 2)] << 6) |
+            (B64_LOOKUP[clean.charAt(i + 3)]);
+    bytes[p++] = (n >> 16) & 0xff;
+    bytes[p++] = (n >> 8) & 0xff;
+    bytes[p++] = n & 0xff;
+  }
+  if (rem === 2) {
+    var n2 = (B64_LOOKUP[clean.charAt(i)] << 18) |
+             (B64_LOOKUP[clean.charAt(i + 1)] << 12);
+    bytes[p++] = (n2 >> 16) & 0xff;
+  } else if (rem === 3) {
+    var n3 = (B64_LOOKUP[clean.charAt(i)] << 18) |
+             (B64_LOOKUP[clean.charAt(i + 1)] << 12) |
+             (B64_LOOKUP[clean.charAt(i + 2)] << 6);
+    bytes[p++] = (n3 >> 16) & 0xff;
+    bytes[p++] = (n3 >> 8) & 0xff;
   }
   return bytes;
 }

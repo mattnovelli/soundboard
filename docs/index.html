@@ -26,8 +26,9 @@
       }
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
         background: var(--bg);
         color: var(--text);
         padding: 16px;
@@ -153,8 +154,8 @@
     <h1>Soundboard</h1>
     <div class="subtitle">
       Add sounds, give each a name and emoji, then press Save. Sounds are stored
-      on your phone and streamed to the watch. Keep clips short (&le;4s) and save
-      a few at a time.
+      on your phone and streamed to the watch. Keep clips short (&le;4s) and
+      save a few at a time.
     </div>
 
     <div class="card">
@@ -190,10 +191,46 @@
         var MAX_PAYLOAD_B64 = 200 * 1024;
 
         var EMOJIS = [
-          "🔊","📣","🎺","🥁","🎉","👏","😀","😂","😎","😭","😱","🤖",
-          "👻","💥","⚡","🔥","💧","🐶","🐱","🐮","🦆","🐸","🎸","🎹",
-          "🚨","📢","💬","❤️","⭐","✅","❌","🎵","🛎️","🐔","🦖","👽",
-          "🤣","🙈","💤","🎬",
+          "🔊",
+          "📣",
+          "🎺",
+          "🥁",
+          "🎉",
+          "👏",
+          "😀",
+          "😂",
+          "😎",
+          "😭",
+          "😱",
+          "🤖",
+          "👻",
+          "💥",
+          "⚡",
+          "🔥",
+          "💧",
+          "🐶",
+          "🐱",
+          "🐮",
+          "🦆",
+          "🐸",
+          "🎸",
+          "🎹",
+          "🚨",
+          "📢",
+          "💬",
+          "❤️",
+          "⭐",
+          "✅",
+          "❌",
+          "🎵",
+          "🛎️",
+          "🐔",
+          "🦖",
+          "👽",
+          "🤣",
+          "🙈",
+          "💤",
+          "🎬",
         ];
 
         var audioCtx = null;
@@ -239,7 +276,7 @@
           for (var i = 0; i < bytes.length; i += chunk) {
             bin += String.fromCharCode.apply(
               null,
-              bytes.subarray(i, i + chunk)
+              bytes.subarray(i, i + chunk),
             );
           }
           return btoa(bin);
@@ -324,7 +361,8 @@
             opt.textContent = EMOJIS[i];
             sel.appendChild(opt);
           }
-          sel.value = selected && EMOJIS.indexOf(selected) >= 0 ? selected : EMOJIS[0];
+          sel.value =
+            selected && EMOJIS.indexOf(selected) >= 0 ? selected : EMOJIS[0];
         }
 
         function fmtBytes(n) {
@@ -338,7 +376,9 @@
             var secs = (row.state.pcmBytes.length / TARGET_RATE).toFixed(1);
             meta.className = "meta";
             meta.textContent =
-              secs + "s \u00b7 " + fmtBytes(row.state.pcmBytes.length) +
+              secs +
+              "s \u00b7 " +
+              fmtBytes(row.state.pcmBytes.length) +
               (row.state.dirty ? " \u00b7 new" : "");
           } else if (row.state.phoneOnly) {
             meta.className = "meta";
@@ -354,7 +394,7 @@
           return bufferToPcm8k(
             row.state.workBuffer,
             row.state.trimStart,
-            row.state.trimEnd
+            row.state.trimEnd,
           ).then(function (bytes) {
             row.state.pcmBytes = bytes;
             row.state.dirty = true;
@@ -394,13 +434,14 @@
               meta.className = "meta warn";
               meta.textContent = "Could not decode that audio file.";
               console.log("decode error: " + err);
-            }
+            },
           );
         }
 
         function createRow(data) {
           data = data || {};
-          var id = data.id || "s" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+          var id =
+            data.id || "s" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
 
           var el = document.createElement("div");
           el.className = "card sound-row";
@@ -412,7 +453,9 @@
             "  </div>",
             '  <div class="name-field">',
             "    <label>Name</label>",
-            '    <input type="text" class="sound-name" maxlength="' + MAX_NAME + '" placeholder="Air horn" />',
+            '    <input type="text" class="sound-name" maxlength="' +
+              MAX_NAME +
+              '" placeholder="Air horn" />',
             "  </div>",
             "</div>",
             '<div class="audio-controls">',
@@ -422,11 +465,11 @@
             '    <button type="button" class="btn preview-btn">Preview</button>',
             '    <button type="button" class="btn danger remove-btn">Remove</button>',
             "  </div>",
-            '  <input type="file" accept="audio/*" class="hidden-file" />',
+            '  <input type="file" accept=".mp3,.wav,.m4a,.aac,.aiff,.aif,.caf,.ogg,.oga,.opus,.flac,.mp4,.3gp,audio/*" class="hidden-file" />',
             '  <div class="trim">',
-            "    <label>Trim start: <span class=\"trim-start-val\">0.00</span>s</label>",
+            '    <label>Trim start: <span class="trim-start-val">0.00</span>s</label>',
             '    <input type="range" class="trim-start" min="0" max="4" step="0.05" value="0" />',
-            "    <label>Trim end: <span class=\"trim-end-val\">0.00</span>s</label>",
+            '    <label>Trim end: <span class="trim-end-val">0.00</span>s</label>',
             '    <input type="range" class="trim-end" min="0" max="4" step="0.05" value="0" />',
             "  </div>",
             '  <div class="meta"></div>',
@@ -467,9 +510,12 @@
 
           // Wiring.
           var fileInput = el.querySelector(".hidden-file");
-          el.querySelector(".upload-btn").addEventListener("click", function () {
-            fileInput.click();
-          });
+          el.querySelector(".upload-btn").addEventListener(
+            "click",
+            function () {
+              fileInput.click();
+            },
+          );
           fileInput.addEventListener("change", function () {
             var file = fileInput.files && fileInput.files[0];
             if (!file) return;
@@ -478,22 +524,31 @@
             });
           });
 
-          el.querySelector(".record-btn").addEventListener("click", function () {
-            toggleRecord(row, this);
-          });
+          el.querySelector(".record-btn").addEventListener(
+            "click",
+            function () {
+              toggleRecord(row, this);
+            },
+          );
 
-          el.querySelector(".preview-btn").addEventListener("click", function () {
-            if (row.state.pcmBytes && row.state.pcmBytes.length) {
-              playPcm8k(row.state.pcmBytes);
-            }
-          });
+          el.querySelector(".preview-btn").addEventListener(
+            "click",
+            function () {
+              if (row.state.pcmBytes && row.state.pcmBytes.length) {
+                playPcm8k(row.state.pcmBytes);
+              }
+            },
+          );
 
-          el.querySelector(".remove-btn").addEventListener("click", function () {
-            var i = rows.indexOf(row);
-            if (i >= 0) rows.splice(i, 1);
-            el.parentNode.removeChild(el);
-            updateGlobalMeta();
-          });
+          el.querySelector(".remove-btn").addEventListener(
+            "click",
+            function () {
+              var i = rows.indexOf(row);
+              if (i >= 0) rows.splice(i, 1);
+              el.parentNode.removeChild(el);
+              updateGlobalMeta();
+            },
+          );
 
           var startR = el.querySelector(".trim-start");
           var endR = el.querySelector(".trim-end");
@@ -602,7 +657,10 @@
             pending.push(reprocessIfNeeded(rows[i]));
           }
           Promise.all(pending).then(function () {
-            var payload = { volume: parseInt(volumeInput.value, 10), sounds: [] };
+            var payload = {
+              volume: parseInt(volumeInput.value, 10),
+              sounds: [],
+            };
             var newB64Total = 0;
 
             for (var i = 0; i < rows.length; i++) {
@@ -612,7 +670,11 @@
               if (!name) {
                 name = "Sound " + (i + 1);
               }
-              var entry = { id: row.id, name: name.substring(0, MAX_NAME), emoji: emoji };
+              var entry = {
+                id: row.id,
+                name: name.substring(0, MAX_NAME),
+                emoji: emoji,
+              };
 
               if (row.state.pcmBytes && row.state.pcmBytes.length) {
                 var b64 = bytesToB64(row.state.pcmBytes);
@@ -649,20 +711,26 @@
           return Promise.resolve();
         }
 
-        document.getElementById("addSound").addEventListener("click", function () {
-          if (rows.length >= MAX_SOUNDS) {
-            var gm = document.getElementById("globalMeta");
-            gm.className = "meta warn";
-            gm.textContent = "Maximum of " + MAX_SOUNDS + " sounds reached.";
-            return;
-          }
-          createRow({});
-        });
+        document
+          .getElementById("addSound")
+          .addEventListener("click", function () {
+            if (rows.length >= MAX_SOUNDS) {
+              var gm = document.getElementById("globalMeta");
+              gm.className = "meta warn";
+              gm.textContent = "Maximum of " + MAX_SOUNDS + " sounds reached.";
+              return;
+            }
+            createRow({});
+          });
 
-        document.getElementById("saveBtn").addEventListener("click", collectAndSave);
-        document.getElementById("cancelBtn").addEventListener("click", function () {
-          window.location.href = "pebblejs://close#";
-        });
+        document
+          .getElementById("saveBtn")
+          .addEventListener("click", collectAndSave);
+        document
+          .getElementById("cancelBtn")
+          .addEventListener("click", function () {
+            window.location.href = "pebblejs://close#";
+          });
 
         // ---- Init from settings passed by PebbleKit JS ----
         function init() {
@@ -671,7 +739,8 @@
           if (raw) {
             try {
               var parsed = JSON.parse(raw);
-              if (typeof parsed.volume === "number") settings.volume = parsed.volume;
+              if (typeof parsed.volume === "number")
+                settings.volume = parsed.volume;
               if (Array.isArray(parsed.sounds)) settings.sounds = parsed.sounds;
             } catch (e) {
               console.log("Failed to parse settings: " + e);

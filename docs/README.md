@@ -17,7 +17,7 @@ resampled to 8 kHz 8-bit mono PCM in the browser and stored on your phone.
 Set the published URL in [`src/pkjs/index.js`](../src/pkjs/index.js):
 
 ```js
-var CONFIG_PAGE_URL = 'https://<your-username>.github.io/soundboard/';
+var CONFIG_PAGE_URL = "https://<your-username>.github.io/soundboard/";
 ```
 
 Then rebuild and reinstall the app.
