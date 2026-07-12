@@ -29,7 +29,7 @@ static int s_sound_count = 0;
 static bool s_list_loaded = false;
 
 static bool s_busy = false;  // a play request is in flight
-static uint8_t s_volume_pct = 70;
+static uint8_t s_volume_pct = 100;
 
 static AppTimer *s_status_hide_timer = NULL;
 static char s_status_text[MAX_STATUS_LEN];

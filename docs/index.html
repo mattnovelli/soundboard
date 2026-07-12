@@ -59,10 +59,11 @@
       input[type="text"],
       select {
         width: 100%;
-        padding: 9px 10px;
+        padding: 11px 12px;
         border: 1px solid var(--border);
         border-radius: 8px;
-        font-size: 15px;
+        /* 16px keeps iOS Safari from zooming the viewport on focus. */
+        font-size: 16px;
         background: #fff;
         color: var(--text);
       }
@@ -91,6 +92,13 @@
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .btn svg {
+        flex: 0 0 auto;
       }
       .btn.primary {
         background: var(--accent);
@@ -99,6 +107,19 @@
       }
       .btn.danger {
         color: var(--danger);
+      }
+      .btn.accent {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .btn.accent:active {
+        background: var(--accent-2);
+      }
+      .btn.accent-outline {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: #eef3fe;
       }
       .btn:active {
         opacity: 0.8;
@@ -124,14 +145,110 @@
         color: var(--danger);
       }
       .trim {
-        margin-top: 10px;
+        margin-top: 12px;
         display: none;
       }
       .trim.active {
         display: block;
       }
-      .trim label {
-        margin-top: 6px;
+      .waveform-wrap {
+        position: relative;
+        height: 92px;
+        background: #eef2f8;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .waveform {
+        position: absolute;
+        inset: 0;
+        display: block;
+      }
+      .trim-dim {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        background: rgba(20, 28, 42, 0.34);
+        pointer-events: none;
+        z-index: 1;
+      }
+      .trim-dim.left {
+        left: 0;
+      }
+      .trim-dim.right {
+        right: 0;
+      }
+      .trim-region {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background: rgba(47, 109, 246, 0.1);
+        border-top: 2px solid var(--accent);
+        border-bottom: 2px solid var(--accent);
+        cursor: grab;
+        touch-action: none;
+        z-index: 2;
+      }
+      .trim-region:active {
+        cursor: grabbing;
+      }
+      .trim-handle {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        margin-left: -10px;
+        background: var(--accent);
+        border-radius: 6px;
+        cursor: ew-resize;
+        touch-action: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+        z-index: 3;
+      }
+      .trim-handle::after {
+        content: "";
+        width: 3px;
+        height: 36%;
+        background: #fff;
+        border-radius: 2px;
+      }
+      .playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #ff3b30;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 4;
+      }
+      .trim-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 10px;
+      }
+      .trim-times {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .play-btn {
+        width: 104px;
+      }
+      .row .remove-btn {
+        flex: 0 0 auto;
+      }
+      .play-btn.playing {
+        background: var(--danger);
+        border-color: var(--danger);
+        color: #fff;
       }
       input[type="range"] {
         width: 100%;
@@ -145,8 +262,10 @@
         background: var(--bg);
         padding: 12px 0 4px;
       }
-      .recording {
-        color: var(--danger);
+      .btn.recording {
+        background: var(--danger);
+        border-color: var(--danger);
+        color: #fff;
       }
     </style>
   </head>
@@ -160,8 +279,8 @@
 
     <div class="card">
       <label for="volume">Playback volume</label>
-      <input id="volume" type="range" min="1" max="100" step="1" value="70" />
-      <div class="meta"><span id="volumeLabel">70%</span></div>
+      <input id="volume" type="range" min="1" max="100" step="1" value="100" />
+      <div class="meta"><span id="volumeLabel">100%</span></div>
     </div>
 
     <div id="soundList"></div>
@@ -189,6 +308,17 @@
         // Soft cap on how much new audio can be returned in a single Save
         // (base64 chars). ~200 KB keeps the close payload safe.
         var MAX_PAYLOAD_B64 = 200 * 1024;
+
+        // Inline SVG icons (Feather set, same paths react-icons ships as Fi*),
+        // so no external dependency or build step is needed on this static page.
+        var IC_UPLOAD =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+        var IC_REC =
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="#e53935" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg>';
+        var IC_STOP =
+          '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
+        var IC_PLAY =
+          '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
 
         // Pebble's firmware only renders this specific set of emoji glyphs
         // (the curated list from the Patch project). Anything outside this set
@@ -381,15 +511,6 @@
           });
         }
 
-        function playPcm8k(bytes) {
-          var ctx = getAudioCtx();
-          var buf = pcmToBuffer(bytes);
-          var src = ctx.createBufferSource();
-          src.buffer = buf;
-          src.connect(ctx.destination);
-          src.start();
-        }
-
         // ---- Row model ----
         // Each row keeps: id, name, emoji, workBuffer (AudioBuffer or null),
         // trimStart, trimEnd, pcmBytes (Uint8Array or null), dirty, phoneOnly.
@@ -428,8 +549,8 @@
             meta.className = "meta";
             meta.textContent = "Audio stored on phone. Upload to replace it.";
           } else {
-            meta.className = "meta warn";
-            meta.textContent = "No audio yet \u2014 upload a file or record.";
+            meta.className = "meta";
+            meta.textContent = "";
           }
         }
 
@@ -451,19 +572,207 @@
           row.state.workBuffer = buffer;
           row.state.trimStart = 0;
           row.state.trimEnd = Math.min(buffer.duration, MAX_SECONDS);
-          var trim = row.el.querySelector(".trim");
-          var startR = row.el.querySelector(".trim-start");
-          var endR = row.el.querySelector(".trim-end");
-          startR.min = 0;
-          startR.max = buffer.duration.toFixed(2);
-          startR.step = 0.05;
-          startR.value = 0;
-          endR.min = 0;
-          endR.max = buffer.duration.toFixed(2);
-          endR.step = 0.05;
-          endR.value = row.state.trimEnd;
-          trim.classList.add("active");
+          showTrimmer(row);
           reprocessRow(row);
+        }
+
+        function showTrimmer(row) {
+          row.el.querySelector(".trim").classList.add("active");
+          if (row.trimmer) {
+            row.trimmer.drawWave();
+            row.trimmer.layout();
+          }
+        }
+
+        // Wire up the waveform trimmer for a row: draw the waveform, drag the
+        // start/end handles, and preview the selected region with a play button.
+        function setupTrimmer(row) {
+          var wrap = row.el.querySelector(".waveform-wrap");
+          var canvas = row.el.querySelector(".waveform");
+          var dimL = row.el.querySelector(".trim-dim.left");
+          var dimR = row.el.querySelector(".trim-dim.right");
+          var region = row.el.querySelector(".trim-region");
+          var hStart = row.el.querySelector(".trim-handle.start");
+          var hEnd = row.el.querySelector(".trim-handle.end");
+          var playhead = row.el.querySelector(".playhead");
+          var playBtn = row.el.querySelector(".play-btn");
+          var selDur = row.el.querySelector(".sel-dur");
+          playBtn.innerHTML = IC_PLAY + "Play";
+
+          function duration() {
+            return row.state.workBuffer ? row.state.workBuffer.duration : 0;
+          }
+
+          function layout() {
+            var dur = duration();
+            if (dur <= 0) return;
+            var w = wrap.clientWidth;
+            var sx = (row.state.trimStart / dur) * w;
+            var ex = (row.state.trimEnd / dur) * w;
+            hStart.style.left = sx + "px";
+            hEnd.style.left = ex + "px";
+            dimL.style.width = sx + "px";
+            dimR.style.width = w - ex + "px";
+            region.style.left = sx + "px";
+            region.style.width = ex - sx + "px";
+            selDur.textContent =
+              (row.state.trimEnd - row.state.trimStart).toFixed(1) + "s";
+          }
+
+          function drawWave() {
+            var buf = row.state.workBuffer;
+            if (!buf) return;
+            var w = wrap.clientWidth;
+            var h = wrap.clientHeight;
+            if (w <= 0) return;
+            var dpr = window.devicePixelRatio || 1;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            canvas.style.width = w + "px";
+            canvas.style.height = h + "px";
+            var ctx = canvas.getContext("2d");
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            var data = buf.getChannelData(0);
+            var step = Math.max(1, Math.floor(data.length / w));
+            var mid = h / 2;
+            ctx.fillStyle = "#9db4d6";
+            for (var x = 0; x < w; x++) {
+              var s = x * step;
+              var e = Math.min(data.length, s + step);
+              var min = 1;
+              var max = -1;
+              for (var i = s; i < e; i++) {
+                var v = data[i];
+                if (v < min) min = v;
+                if (v > max) max = v;
+              }
+              var y1 = mid + min * mid * 0.9;
+              var y2 = mid + max * mid * 0.9;
+              ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+            }
+          }
+
+          function pxToTime(clientX) {
+            var rect = wrap.getBoundingClientRect();
+            var x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+            return (x / rect.width) * duration();
+          }
+
+          var dragging = null;
+          var grabOffset = 0;
+          function onMove(e) {
+            if (!dragging) return;
+            var minGap = 0.1;
+            var t = pxToTime(e.clientX);
+            if (dragging === "start") {
+              t = Math.max(0, Math.min(t, row.state.trimEnd - minGap));
+              if (row.state.trimEnd - t > MAX_SECONDS) {
+                t = row.state.trimEnd - MAX_SECONDS;
+              }
+              row.state.trimStart = t;
+            } else if (dragging === "end") {
+              t = Math.min(duration(), Math.max(t, row.state.trimStart + minGap));
+              if (t - row.state.trimStart > MAX_SECONDS) {
+                t = row.state.trimStart + MAX_SECONDS;
+              }
+              row.state.trimEnd = t;
+            } else {
+              // Slide the whole selection window, preserving its length.
+              var width = row.state.trimEnd - row.state.trimStart;
+              var newStart = t - grabOffset;
+              newStart = Math.max(0, Math.min(duration() - width, newStart));
+              row.state.trimStart = newStart;
+              row.state.trimEnd = newStart + width;
+            }
+            layout();
+          }
+          function onUp() {
+            if (!dragging) return;
+            dragging = null;
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+            reprocessRow(row);
+          }
+          function beginDrag(which, e) {
+            dragging = which;
+            if (which === "region") {
+              grabOffset = pxToTime(e.clientX) - row.state.trimStart;
+            }
+            e.preventDefault();
+            stopPlay();
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", onUp);
+          }
+          hStart.addEventListener("pointerdown", function (e) {
+            beginDrag("start", e);
+          });
+          hEnd.addEventListener("pointerdown", function (e) {
+            beginDrag("end", e);
+          });
+          region.addEventListener("pointerdown", function (e) {
+            beginDrag("region", e);
+          });
+
+          var source = null;
+          var raf = 0;
+          function stopPlay() {
+            if (source) {
+              try {
+                source.stop();
+              } catch (e) {}
+              source = null;
+            }
+            if (raf) {
+              cancelAnimationFrame(raf);
+              raf = 0;
+            }
+            playhead.style.opacity = 0;
+            playBtn.innerHTML = IC_PLAY + "Play";
+            playBtn.classList.remove("playing");
+          }
+          function startPlay() {
+            var buf = row.state.workBuffer;
+            if (!buf) return;
+            stopPlay();
+            var ctx = getAudioCtx();
+            var startT = row.state.trimStart;
+            var dur = Math.min(row.state.trimEnd - startT, MAX_SECONDS);
+            if (dur <= 0) return;
+            var src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0, startT, dur);
+            source = src;
+            src.onended = function () {
+              stopPlay();
+            };
+            var t0 = ctx.currentTime;
+            playBtn.innerHTML = IC_STOP + "Stop";
+            playBtn.classList.add("playing");
+            playhead.style.opacity = 1;
+            function tick() {
+              var elapsed = getAudioCtx().currentTime - t0;
+              if (elapsed >= dur) {
+                stopPlay();
+                return;
+              }
+              var frac = (startT + elapsed) / duration();
+              playhead.style.left = frac * wrap.clientWidth + "px";
+              raf = requestAnimationFrame(tick);
+            }
+            raf = requestAnimationFrame(tick);
+          }
+          playBtn.addEventListener("click", function () {
+            if (source) stopPlay();
+            else startPlay();
+          });
+
+          row.trimmer = {
+            drawWave: drawWave,
+            layout: layout,
+            stopPlay: stopPlay,
+          };
         }
 
         function decodeArrayBuffer(row, arrayBuffer) {
@@ -492,8 +801,7 @@
           el.innerHTML = [
             '<div class="row">',
             '  <div class="emoji-field">',
-            "    <label>Emoji</label>",
-            '    <select class="emoji-select"></select>',
+            '    <select class="emoji-select" aria-label="Emoji"></select>',
             "  </div>",
             '  <div class="name-field">',
             "    <label>Name</label>",
@@ -501,20 +809,28 @@
               MAX_NAME +
               '" placeholder="Air horn" />',
             "  </div>",
+            '  <button type="button" class="btn danger remove-btn">Remove</button>',
             "</div>",
             '<div class="audio-controls">',
             '  <div class="btn-row">',
-            '    <button type="button" class="btn upload-btn">Upload file</button>',
-            '    <button type="button" class="btn record-btn">Record</button>',
-            '    <button type="button" class="btn preview-btn">Preview</button>',
-            '    <button type="button" class="btn danger remove-btn">Remove</button>',
+            '    <button type="button" class="btn accent upload-btn">Upload file</button>',
+            '    <button type="button" class="btn accent-outline record-btn">Record</button>',
             "  </div>",
             '  <input type="file" accept=".mp3,.wav,.m4a,.aac,.aiff,.aif,.caf,.ogg,.oga,.opus,.flac,.mp4,.3gp,audio/*" class="hidden-file" />',
             '  <div class="trim">',
-            '    <label>Trim start: <span class="trim-start-val">0.00</span>s</label>',
-            '    <input type="range" class="trim-start" min="0" max="4" step="0.05" value="0" />',
-            '    <label>Trim end: <span class="trim-end-val">0.00</span>s</label>',
-            '    <input type="range" class="trim-end" min="0" max="4" step="0.05" value="0" />',
+            '    <div class="waveform-wrap">',
+            '      <canvas class="waveform"></canvas>',
+            '      <div class="trim-dim left"></div>',
+            '      <div class="trim-dim right"></div>',
+            '      <div class="trim-region"></div>',
+            '      <div class="playhead"></div>',
+            '      <div class="trim-handle start"></div>',
+            '      <div class="trim-handle end"></div>',
+            "    </div>",
+            '    <div class="trim-toolbar">',
+            '      <button type="button" class="btn accent play-btn">Play</button>',
+            '      <span class="trim-times"><span class="sel-dur">0.0s</span> selected</span>',
+            "    </div>",
             "  </div>",
             '  <div class="meta"></div>',
             "</div>",
@@ -523,6 +839,7 @@
           var row = {
             el: el,
             id: id,
+            trimmer: null,
             state: {
               workBuffer: null,
               trimStart: 0,
@@ -534,7 +851,10 @@
           };
 
           var emojiSel = el.querySelector(".emoji-select");
-          populateEmojiSelect(emojiSel, data.emoji);
+          // New sounds get a random emoji; existing ones keep their choice.
+          var defaultEmoji =
+            data.emoji || EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+          populateEmojiSelect(emojiSel, defaultEmoji);
           el.querySelector(".sound-name").value = data.name || "";
 
           // Load any PCM the page has stored for this id (for preview/resend).
@@ -550,16 +870,14 @@
             // Metadata came from the phone but we have no local audio copy.
             row.state.phoneOnly = true;
           }
-          updateRowMeta(row);
 
           // Wiring.
           var fileInput = el.querySelector(".hidden-file");
-          el.querySelector(".upload-btn").addEventListener(
-            "click",
-            function () {
-              fileInput.click();
-            },
-          );
+          el.querySelector(".upload-btn").innerHTML = IC_UPLOAD + "Upload file";
+          el.querySelector(".record-btn").innerHTML = IC_REC + "Record";
+          el.querySelector(".upload-btn").addEventListener("click", function () {
+            fileInput.click();
+          });
           fileInput.addEventListener("change", function () {
             var file = fileInput.files && fileInput.files[0];
             if (!file) return;
@@ -568,66 +886,26 @@
             });
           });
 
-          el.querySelector(".record-btn").addEventListener(
-            "click",
-            function () {
-              toggleRecord(row, this);
-            },
-          );
+          el.querySelector(".record-btn").addEventListener("click", function () {
+            toggleRecord(row, this);
+          });
 
-          el.querySelector(".preview-btn").addEventListener(
-            "click",
-            function () {
-              if (row.state.pcmBytes && row.state.pcmBytes.length) {
-                playPcm8k(row.state.pcmBytes);
-              }
-            },
-          );
+          el.querySelector(".remove-btn").addEventListener("click", function () {
+            if (row.trimmer) row.trimmer.stopPlay();
+            var i = rows.indexOf(row);
+            if (i >= 0) rows.splice(i, 1);
+            el.parentNode.removeChild(el);
+            updateGlobalMeta();
+          });
 
-          el.querySelector(".remove-btn").addEventListener(
-            "click",
-            function () {
-              var i = rows.indexOf(row);
-              if (i >= 0) rows.splice(i, 1);
-              el.parentNode.removeChild(el);
-              updateGlobalMeta();
-            },
-          );
-
-          var startR = el.querySelector(".trim-start");
-          var endR = el.querySelector(".trim-end");
-          var startVal = el.querySelector(".trim-start-val");
-          var endVal = el.querySelector(".trim-end-val");
-          var trimTimer = null;
-          function onTrim() {
-            var s = parseFloat(startR.value);
-            var e = parseFloat(endR.value);
-            if (e < s + 0.05) {
-              e = s + 0.05;
-              endR.value = e;
-            }
-            row.state.trimStart = s;
-            row.state.trimEnd = e;
-            startVal.textContent = s.toFixed(2);
-            endVal.textContent = e.toFixed(2);
-            if (trimTimer) clearTimeout(trimTimer);
-            trimTimer = setTimeout(function () {
-              reprocessRow(row);
-            }, 250);
-          }
-          startR.addEventListener("input", onTrim);
-          endR.addEventListener("input", onTrim);
-
-          if (row.state.workBuffer) {
-            startR.max = row.state.workBuffer.duration.toFixed(2);
-            endR.max = row.state.workBuffer.duration.toFixed(2);
-            endR.value = row.state.trimEnd;
-            endVal.textContent = row.state.trimEnd.toFixed(2);
-            el.querySelector(".trim").classList.add("active");
-          }
-
+          // Append before wiring the trimmer so the canvas has a measurable width.
           rows.push(row);
           listEl.appendChild(el);
+          setupTrimmer(row);
+          if (row.state.workBuffer) {
+            showTrimmer(row);
+          }
+          updateRowMeta(row);
           updateGlobalMeta();
           return row;
         }
@@ -654,7 +932,7 @@
               var chunks = [];
               var rec = new MediaRecorder(stream);
               activeRecorder = { row: row, recorder: rec, btn: btn };
-              btn.textContent = "Stop";
+              btn.innerHTML = IC_STOP + "Stop";
               btn.classList.add("recording");
               rec.ondataavailable = function (ev) {
                 if (ev.data && ev.data.size) chunks.push(ev.data);
@@ -663,7 +941,7 @@
                 stream.getTracks().forEach(function (t) {
                   t.stop();
                 });
-                btn.textContent = "Record";
+                btn.innerHTML = IC_REC + "Record";
                 btn.classList.remove("recording");
                 activeRecorder = null;
                 var blob = new Blob(chunks);
@@ -692,6 +970,20 @@
         var volumeLabel = document.getElementById("volumeLabel");
         volumeInput.addEventListener("input", function () {
           volumeLabel.textContent = volumeInput.value + "%";
+        });
+
+        // Redraw waveforms when the viewport size changes (e.g. rotation).
+        var resizeTimer = null;
+        window.addEventListener("resize", function () {
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(function () {
+            for (var i = 0; i < rows.length; i++) {
+              if (rows[i].trimmer && rows[i].state.workBuffer) {
+                rows[i].trimmer.drawWave();
+                rows[i].trimmer.layout();
+              }
+            }
+          }, 150);
         });
 
         // ---- Save / Cancel ----
@@ -779,7 +1071,7 @@
         // ---- Init from settings passed by PebbleKit JS ----
         function init() {
           var raw = getParam("settings");
-          var settings = { volume: 70, sounds: [] };
+          var settings = { volume: 100, sounds: [] };
           if (raw) {
             try {
               var parsed = JSON.parse(raw);

@@ -39,11 +39,11 @@ function getSettings() {
   try {
     var s = JSON.parse(localStorage.getItem('sb_settings')) || {};
     return {
-      volume: typeof s.volume === 'number' ? s.volume : 70,
+      volume: typeof s.volume === 'number' ? s.volume : 100,
       sounds: Array.isArray(s.sounds) ? s.sounds : []
     };
   } catch (e) {
-    return { volume: 70, sounds: [] };
+    return { volume: 100, sounds: [] };
   }
 }
 
