@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <title>Soundboard Config</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6fa;
+        --card: #ffffff;
+        --border: #dce2ec;
+        --text: #1c2432;
+        --muted: #5d697a;
+        --accent: #2f6df6;
+        --accent-2: #2459cc;
+        --danger: #c0392b;
+        --ok: #1b5f3a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        padding: 16px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 4px 0 2px;
+      }
+      .subtitle {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 16px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      input[type="text"],
+      select {
+        width: 100%;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 15px;
+        background: #fff;
+        color: var(--text);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+      .row .emoji-field {
+        flex: 0 0 84px;
+      }
+      .row .name-field {
+        flex: 1 1 auto;
+      }
+      .emoji-select {
+        font-size: 20px;
+        text-align: center;
+      }
+      .btn {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--text);
+        border-radius: 8px;
+        padding: 9px 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .btn.danger {
+        color: var(--danger);
+      }
+      .btn:active {
+        opacity: 0.8;
+      }
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .audio-controls {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--border);
+      }
+      .meta {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+        min-height: 16px;
+      }
+      .meta.warn {
+        color: var(--danger);
+      }
+      .trim {
+        margin-top: 10px;
+        display: none;
+      }
+      .trim.active {
+        display: block;
+      }
+      .trim label {
+        margin-top: 6px;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .hidden-file {
+        display: none;
+      }
+      .sticky-actions {
+        position: sticky;
+        bottom: 0;
+        background: var(--bg);
+        padding: 12px 0 4px;
+      }
+      .recording {
+        color: var(--danger);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Soundboard</h1>
+    <div class="subtitle">
+      Add sounds, give each a name and emoji, then press Save. Sounds are stored
+      on your phone and streamed to the watch. Keep clips short (&le;4s) and save
+      a few at a time.
+    </div>
+
+    <div class="card">
+      <label for="volume">Playback volume</label>
+      <input id="volume" type="range" min="1" max="100" step="1" value="70" />
+      <div class="meta"><span id="volumeLabel">70%</span></div>
+    </div>
+
+    <div id="soundList"></div>
+
+    <div class="btn-row">
+      <button id="addSound" class="btn" type="button">+ Add sound</button>
+    </div>
+
+    <div class="sticky-actions">
+      <div class="btn-row">
+        <button id="saveBtn" class="btn primary" type="button">Save</button>
+        <button id="cancelBtn" class="btn" type="button">Cancel</button>
+      </div>
+      <div id="globalMeta" class="meta"></div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var TARGET_RATE = 8000;
+        var MAX_SECONDS = 4;
+        var MAX_SOUNDS = 20;
+        var MAX_NAME = 24;
+        // Soft cap on how much new audio can be returned in a single Save
+        // (base64 chars). ~200 KB keeps the close payload safe.
+        var MAX_PAYLOAD_B64 = 200 * 1024;
+
+        var EMOJIS = [
+          "🔊","📣","🎺","🥁","🎉","👏","😀","😂","😎","😭","😱","🤖",
+          "👻","💥","⚡","🔥","💧","🐶","🐱","🐮","🦆","🐸","🎸","🎹",
+          "🚨","📢","💬","❤️","⭐","✅","❌","🎵","🛎️","🐔","🦖","👽",
+          "🤣","🙈","💤","🎬",
+        ];
+
+        var audioCtx = null;
+        function getAudioCtx() {
+          if (!audioCtx) {
+            var Ctor = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new Ctor();
+          }
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+          return audioCtx;
+        }
+
+        function getParam(name) {
+          var params = new URLSearchParams(window.location.search);
+          return params.get(name);
+        }
+
+        function receiverUri() {
+          return window.location.origin + window.location.pathname;
+        }
+
+        // ---- localStorage helpers (page side, for preview + resend) ----
+        function pagePcmKey(id) {
+          return "sbpage_pcm_" + id;
+        }
+        function loadPagePcm(id) {
+          return localStorage.getItem(pagePcmKey(id)) || "";
+        }
+        function savePagePcm(id, b64) {
+          try {
+            localStorage.setItem(pagePcmKey(id), b64);
+          } catch (e) {
+            /* ignore quota errors */
+          }
+        }
+
+        // ---- base64 <-> bytes ----
+        function bytesToB64(bytes) {
+          var bin = "";
+          var chunk = 0x8000;
+          for (var i = 0; i < bytes.length; i += chunk) {
+            bin += String.fromCharCode.apply(
+              null,
+              bytes.subarray(i, i + chunk)
+            );
+          }
+          return btoa(bin);
+        }
+        function b64ToBytes(b64) {
+          var bin = atob(b64);
+          var out = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) {
+            out[i] = bin.charCodeAt(i);
+          }
+          return out;
+        }
+
+        // Build an 8 kHz mono AudioBuffer from stored signed-8-bit PCM bytes.
+        function pcmToBuffer(bytes) {
+          var ctx = getAudioCtx();
+          var buf = ctx.createBuffer(1, bytes.length || 1, TARGET_RATE);
+          var ch = buf.getChannelData(0);
+          for (var i = 0; i < bytes.length; i++) {
+            var s = (bytes[i] << 24) >> 24; // sign-extend to -128..127
+            ch[i] = s / 127;
+          }
+          return buf;
+        }
+
+        // Resample/trim an AudioBuffer to signed 8-bit mono at 8 kHz.
+        function bufferToPcm8k(buffer, startSec, endSec) {
+          return new Promise(function (resolve, reject) {
+            var start = Math.max(0, startSec);
+            var end = Math.min(buffer.duration, endSec);
+            var dur = Math.min(Math.max(0, end - start), MAX_SECONDS);
+            var frames = Math.floor(dur * TARGET_RATE);
+            if (frames <= 0) {
+              resolve(new Uint8Array(0));
+              return;
+            }
+            var Offline =
+              window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            var offline = new Offline(1, frames, TARGET_RATE);
+            var src = offline.createBufferSource();
+            src.buffer = buffer;
+            src.connect(offline.destination);
+            src.start(0, start, dur);
+            offline
+              .startRendering()
+              .then(function (rendered) {
+                var data = rendered.getChannelData(0);
+                var out = new Uint8Array(frames);
+                for (var i = 0; i < frames; i++) {
+                  var v = data[i];
+                  if (v > 1) v = 1;
+                  if (v < -1) v = -1;
+                  out[i] = Math.round(v * 127) & 0xff;
+                }
+                resolve(out);
+              })
+              .catch(reject);
+          });
+        }
+
+        function playPcm8k(bytes) {
+          var ctx = getAudioCtx();
+          var buf = pcmToBuffer(bytes);
+          var src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(ctx.destination);
+          src.start();
+        }
+
+        // ---- Row model ----
+        // Each row keeps: id, name, emoji, workBuffer (AudioBuffer or null),
+        // trimStart, trimEnd, pcmBytes (Uint8Array or null), dirty, phoneOnly.
+
+        var listEl = document.getElementById("soundList");
+        var rows = [];
+
+        function populateEmojiSelect(sel, selected) {
+          sel.innerHTML = "";
+          for (var i = 0; i < EMOJIS.length; i++) {
+            var opt = document.createElement("option");
+            opt.value = EMOJIS[i];
+            opt.textContent = EMOJIS[i];
+            sel.appendChild(opt);
+          }
+          sel.value = selected && EMOJIS.indexOf(selected) >= 0 ? selected : EMOJIS[0];
+        }
+
+        function fmtBytes(n) {
+          if (n < 1024) return n + " B";
+          return (n / 1024).toFixed(1) + " KB";
+        }
+
+        function updateRowMeta(row) {
+          var meta = row.el.querySelector(".meta");
+          if (row.state.pcmBytes && row.state.pcmBytes.length) {
+            var secs = (row.state.pcmBytes.length / TARGET_RATE).toFixed(1);
+            meta.className = "meta";
+            meta.textContent =
+              secs + "s \u00b7 " + fmtBytes(row.state.pcmBytes.length) +
+              (row.state.dirty ? " \u00b7 new" : "");
+          } else if (row.state.phoneOnly) {
+            meta.className = "meta";
+            meta.textContent = "Audio stored on phone. Upload to replace it.";
+          } else {
+            meta.className = "meta warn";
+            meta.textContent = "No audio yet \u2014 upload a file or record.";
+          }
+        }
+
+        function reprocessRow(row) {
+          if (!row.state.workBuffer) return Promise.resolve();
+          return bufferToPcm8k(
+            row.state.workBuffer,
+            row.state.trimStart,
+            row.state.trimEnd
+          ).then(function (bytes) {
+            row.state.pcmBytes = bytes;
+            row.state.dirty = true;
+            row.state.phoneOnly = false;
+            updateRowMeta(row);
+          });
+        }
+
+        function setWorkBuffer(row, buffer) {
+          row.state.workBuffer = buffer;
+          row.state.trimStart = 0;
+          row.state.trimEnd = Math.min(buffer.duration, MAX_SECONDS);
+          var trim = row.el.querySelector(".trim");
+          var startR = row.el.querySelector(".trim-start");
+          var endR = row.el.querySelector(".trim-end");
+          startR.min = 0;
+          startR.max = buffer.duration.toFixed(2);
+          startR.step = 0.05;
+          startR.value = 0;
+          endR.min = 0;
+          endR.max = buffer.duration.toFixed(2);
+          endR.step = 0.05;
+          endR.value = row.state.trimEnd;
+          trim.classList.add("active");
+          reprocessRow(row);
+        }
+
+        function decodeArrayBuffer(row, arrayBuffer) {
+          var ctx = getAudioCtx();
+          ctx.decodeAudioData(
+            arrayBuffer,
+            function (buf) {
+              setWorkBuffer(row, buf);
+            },
+            function (err) {
+              var meta = row.el.querySelector(".meta");
+              meta.className = "meta warn";
+              meta.textContent = "Could not decode that audio file.";
+              console.log("decode error: " + err);
+            }
+          );
+        }
+
+        function createRow(data) {
+          data = data || {};
+          var id = data.id || "s" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+
+          var el = document.createElement("div");
+          el.className = "card sound-row";
+          el.innerHTML = [
+            '<div class="row">',
+            '  <div class="emoji-field">',
+            "    <label>Emoji</label>",
+            '    <select class="emoji-select"></select>',
+            "  </div>",
+            '  <div class="name-field">',
+            "    <label>Name</label>",
+            '    <input type="text" class="sound-name" maxlength="' + MAX_NAME + '" placeholder="Air horn" />',
+            "  </div>",
+            "</div>",
+            '<div class="audio-controls">',
+            '  <div class="btn-row">',
+            '    <button type="button" class="btn upload-btn">Upload file</button>',
+            '    <button type="button" class="btn record-btn">Record</button>',
+            '    <button type="button" class="btn preview-btn">Preview</button>',
+            '    <button type="button" class="btn danger remove-btn">Remove</button>',
+            "  </div>",
+            '  <input type="file" accept="audio/*" class="hidden-file" />',
+            '  <div class="trim">',
+            "    <label>Trim start: <span class=\"trim-start-val\">0.00</span>s</label>",
+            '    <input type="range" class="trim-start" min="0" max="4" step="0.05" value="0" />',
+            "    <label>Trim end: <span class=\"trim-end-val\">0.00</span>s</label>",
+            '    <input type="range" class="trim-end" min="0" max="4" step="0.05" value="0" />',
+            "  </div>",
+            '  <div class="meta"></div>',
+            "</div>",
+          ].join("");
+
+          var row = {
+            el: el,
+            id: id,
+            state: {
+              workBuffer: null,
+              trimStart: 0,
+              trimEnd: 0,
+              pcmBytes: null,
+              dirty: false,
+              phoneOnly: false,
+            },
+          };
+
+          var emojiSel = el.querySelector(".emoji-select");
+          populateEmojiSelect(emojiSel, data.emoji);
+          el.querySelector(".sound-name").value = data.name || "";
+
+          // Load any PCM the page has stored for this id (for preview/resend).
+          var storedB64 = loadPagePcm(id);
+          if (storedB64) {
+            var bytes = b64ToBytes(storedB64);
+            row.state.pcmBytes = bytes;
+            row.state.workBuffer = pcmToBuffer(bytes);
+            row.state.trimStart = 0;
+            row.state.trimEnd = row.state.workBuffer.duration;
+            row.state.dirty = false;
+          } else if (data.id) {
+            // Metadata came from the phone but we have no local audio copy.
+            row.state.phoneOnly = true;
+          }
+          updateRowMeta(row);
+
+          // Wiring.
+          var fileInput = el.querySelector(".hidden-file");
+          el.querySelector(".upload-btn").addEventListener("click", function () {
+            fileInput.click();
+          });
+          fileInput.addEventListener("change", function () {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            file.arrayBuffer().then(function (ab) {
+              decodeArrayBuffer(row, ab);
+            });
+          });
+
+          el.querySelector(".record-btn").addEventListener("click", function () {
+            toggleRecord(row, this);
+          });
+
+          el.querySelector(".preview-btn").addEventListener("click", function () {
+            if (row.state.pcmBytes && row.state.pcmBytes.length) {
+              playPcm8k(row.state.pcmBytes);
+            }
+          });
+
+          el.querySelector(".remove-btn").addEventListener("click", function () {
+            var i = rows.indexOf(row);
+            if (i >= 0) rows.splice(i, 1);
+            el.parentNode.removeChild(el);
+            updateGlobalMeta();
+          });
+
+          var startR = el.querySelector(".trim-start");
+          var endR = el.querySelector(".trim-end");
+          var startVal = el.querySelector(".trim-start-val");
+          var endVal = el.querySelector(".trim-end-val");
+          var trimTimer = null;
+          function onTrim() {
+            var s = parseFloat(startR.value);
+            var e = parseFloat(endR.value);
+            if (e < s + 0.05) {
+              e = s + 0.05;
+              endR.value = e;
+            }
+            row.state.trimStart = s;
+            row.state.trimEnd = e;
+            startVal.textContent = s.toFixed(2);
+            endVal.textContent = e.toFixed(2);
+            if (trimTimer) clearTimeout(trimTimer);
+            trimTimer = setTimeout(function () {
+              reprocessRow(row);
+            }, 250);
+          }
+          startR.addEventListener("input", onTrim);
+          endR.addEventListener("input", onTrim);
+
+          if (row.state.workBuffer) {
+            startR.max = row.state.workBuffer.duration.toFixed(2);
+            endR.max = row.state.workBuffer.duration.toFixed(2);
+            endR.value = row.state.trimEnd;
+            endVal.textContent = row.state.trimEnd.toFixed(2);
+            el.querySelector(".trim").classList.add("active");
+          }
+
+          rows.push(row);
+          listEl.appendChild(el);
+          updateGlobalMeta();
+          return row;
+        }
+
+        // ---- Recording ----
+        var activeRecorder = null;
+        function toggleRecord(row, btn) {
+          if (activeRecorder && activeRecorder.row === row) {
+            activeRecorder.recorder.stop();
+            return;
+          }
+          if (activeRecorder) {
+            activeRecorder.recorder.stop();
+          }
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            var meta = row.el.querySelector(".meta");
+            meta.className = "meta warn";
+            meta.textContent = "Recording not supported in this browser.";
+            return;
+          }
+          navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then(function (stream) {
+              var chunks = [];
+              var rec = new MediaRecorder(stream);
+              activeRecorder = { row: row, recorder: rec, btn: btn };
+              btn.textContent = "Stop";
+              btn.classList.add("recording");
+              rec.ondataavailable = function (ev) {
+                if (ev.data && ev.data.size) chunks.push(ev.data);
+              };
+              rec.onstop = function () {
+                stream.getTracks().forEach(function (t) {
+                  t.stop();
+                });
+                btn.textContent = "Record";
+                btn.classList.remove("recording");
+                activeRecorder = null;
+                var blob = new Blob(chunks);
+                blob.arrayBuffer().then(function (ab) {
+                  decodeArrayBuffer(row, ab);
+                });
+              };
+              rec.start();
+            })
+            .catch(function (err) {
+              var meta = row.el.querySelector(".meta");
+              meta.className = "meta warn";
+              meta.textContent = "Microphone access denied.";
+              console.log("getUserMedia error: " + err);
+            });
+        }
+
+        // ---- Global meta / limits ----
+        function updateGlobalMeta() {
+          var el = document.getElementById("globalMeta");
+          el.textContent = rows.length + " / " + MAX_SOUNDS + " sounds";
+        }
+
+        // ---- Volume ----
+        var volumeInput = document.getElementById("volume");
+        var volumeLabel = document.getElementById("volumeLabel");
+        volumeInput.addEventListener("input", function () {
+          volumeLabel.textContent = volumeInput.value + "%";
+        });
+
+        // ---- Save / Cancel ----
+        function collectAndSave() {
+          var pending = [];
+          for (var i = 0; i < rows.length; i++) {
+            pending.push(reprocessIfNeeded(rows[i]));
+          }
+          Promise.all(pending).then(function () {
+            var payload = { volume: parseInt(volumeInput.value, 10), sounds: [] };
+            var newB64Total = 0;
+
+            for (var i = 0; i < rows.length; i++) {
+              var row = rows[i];
+              var name = row.el.querySelector(".sound-name").value.trim();
+              var emoji = row.el.querySelector(".emoji-select").value;
+              if (!name) {
+                name = "Sound " + (i + 1);
+              }
+              var entry = { id: row.id, name: name.substring(0, MAX_NAME), emoji: emoji };
+
+              if (row.state.pcmBytes && row.state.pcmBytes.length) {
+                var b64 = bytesToB64(row.state.pcmBytes);
+                savePagePcm(row.id, b64);
+                // Only send audio for new/changed sounds; the phone keeps the
+                // rest.
+                if (row.state.dirty) {
+                  entry.pcm = b64;
+                  newB64Total += b64.length;
+                }
+              }
+              payload.sounds.push(entry);
+            }
+
+            if (newB64Total > MAX_PAYLOAD_B64) {
+              var gm = document.getElementById("globalMeta");
+              gm.className = "meta warn";
+              gm.textContent =
+                "Too much new audio at once. Save fewer new sounds, then add more.";
+              return;
+            }
+
+            var json = JSON.stringify(payload);
+            window.location.href =
+              "pebblejs://close#" + encodeURIComponent(json);
+          });
+        }
+
+        function reprocessIfNeeded(row) {
+          // Ensure pcm reflects current trim values before saving.
+          if (row.state.workBuffer && row.state.dirty) {
+            return reprocessRow(row);
+          }
+          return Promise.resolve();
+        }
+
+        document.getElementById("addSound").addEventListener("click", function () {
+          if (rows.length >= MAX_SOUNDS) {
+            var gm = document.getElementById("globalMeta");
+            gm.className = "meta warn";
+            gm.textContent = "Maximum of " + MAX_SOUNDS + " sounds reached.";
+            return;
+          }
+          createRow({});
+        });
+
+        document.getElementById("saveBtn").addEventListener("click", collectAndSave);
+        document.getElementById("cancelBtn").addEventListener("click", function () {
+          window.location.href = "pebblejs://close#";
+        });
+
+        // ---- Init from settings passed by PebbleKit JS ----
+        function init() {
+          var raw = getParam("settings");
+          var settings = { volume: 70, sounds: [] };
+          if (raw) {
+            try {
+              var parsed = JSON.parse(raw);
+              if (typeof parsed.volume === "number") settings.volume = parsed.volume;
+              if (Array.isArray(parsed.sounds)) settings.sounds = parsed.sounds;
+            } catch (e) {
+              console.log("Failed to parse settings: " + e);
+            }
+          }
+
+          volumeInput.value = settings.volume;
+          volumeLabel.textContent = settings.volume + "%";
+
+          if (settings.sounds.length === 0) {
+            createRow({});
+          } else {
+            for (var i = 0; i < settings.sounds.length; i++) {
+              createRow(settings.sounds[i]);
+            }
+          }
+          updateGlobalMeta();
+        }
+
+        init();
+      })();
+    </script>
+  </body>
+</html>
