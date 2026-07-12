@@ -56,6 +56,21 @@
         color: var(--muted);
         margin-bottom: 4px;
       }
+      .switch-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0;
+        cursor: pointer;
+      }
+      .switch-row input {
+        width: 20px;
+        height: 20px;
+        accent-color: var(--accent);
+      }
       input[type="text"],
       select {
         width: 100%;
@@ -281,6 +296,18 @@
       <label for="volume">Playback volume</label>
       <input id="volume" type="range" min="1" max="100" step="1" value="100" />
       <div class="meta"><span id="volumeLabel">100%</span></div>
+    </div>
+
+    <div class="card">
+      <label class="switch-row">
+        <input id="gridMode" type="checkbox" />
+        <span>Touch grid mode</span>
+      </label>
+      <div class="meta">
+        Show a 2&times;2 grid of emoji tiles instead of a list. Tap a tile to
+        play; swipe up/down or use the buttons to change page. (Touch watches
+        only.)
+      </div>
     </div>
 
     <div id="soundList"></div>
@@ -672,7 +699,10 @@
               }
               row.state.trimStart = t;
             } else if (dragging === "end") {
-              t = Math.min(duration(), Math.max(t, row.state.trimStart + minGap));
+              t = Math.min(
+                duration(),
+                Math.max(t, row.state.trimStart + minGap),
+              );
               if (t - row.state.trimStart > MAX_SECONDS) {
                 t = row.state.trimStart + MAX_SECONDS;
               }
@@ -875,9 +905,12 @@
           var fileInput = el.querySelector(".hidden-file");
           el.querySelector(".upload-btn").innerHTML = IC_UPLOAD + "Upload file";
           el.querySelector(".record-btn").innerHTML = IC_REC + "Record";
-          el.querySelector(".upload-btn").addEventListener("click", function () {
-            fileInput.click();
-          });
+          el.querySelector(".upload-btn").addEventListener(
+            "click",
+            function () {
+              fileInput.click();
+            },
+          );
           fileInput.addEventListener("change", function () {
             var file = fileInput.files && fileInput.files[0];
             if (!file) return;
@@ -886,17 +919,23 @@
             });
           });
 
-          el.querySelector(".record-btn").addEventListener("click", function () {
-            toggleRecord(row, this);
-          });
+          el.querySelector(".record-btn").addEventListener(
+            "click",
+            function () {
+              toggleRecord(row, this);
+            },
+          );
 
-          el.querySelector(".remove-btn").addEventListener("click", function () {
-            if (row.trimmer) row.trimmer.stopPlay();
-            var i = rows.indexOf(row);
-            if (i >= 0) rows.splice(i, 1);
-            el.parentNode.removeChild(el);
-            updateGlobalMeta();
-          });
+          el.querySelector(".remove-btn").addEventListener(
+            "click",
+            function () {
+              if (row.trimmer) row.trimmer.stopPlay();
+              var i = rows.indexOf(row);
+              if (i >= 0) rows.splice(i, 1);
+              el.parentNode.removeChild(el);
+              updateGlobalMeta();
+            },
+          );
 
           // Append before wiring the trimmer so the canvas has a measurable width.
           rows.push(row);
@@ -995,6 +1034,7 @@
           Promise.all(pending).then(function () {
             var payload = {
               volume: parseInt(volumeInput.value, 10),
+              gridMode: document.getElementById("gridMode").checked,
               sounds: [],
             };
             var newB64Total = 0;
@@ -1071,12 +1111,14 @@
         // ---- Init from settings passed by PebbleKit JS ----
         function init() {
           var raw = getParam("settings");
-          var settings = { volume: 100, sounds: [] };
+          var settings = { volume: 100, gridMode: false, sounds: [] };
           if (raw) {
             try {
               var parsed = JSON.parse(raw);
               if (typeof parsed.volume === "number")
                 settings.volume = parsed.volume;
+              if (typeof parsed.gridMode === "boolean")
+                settings.gridMode = parsed.gridMode;
               if (Array.isArray(parsed.sounds)) settings.sounds = parsed.sounds;
             } catch (e) {
               console.log("Failed to parse settings: " + e);
@@ -1085,6 +1127,7 @@
 
           volumeInput.value = settings.volume;
           volumeLabel.textContent = settings.volume + "%";
+          document.getElementById("gridMode").checked = !!settings.gridMode;
 
           if (settings.sounds.length === 0) {
             createRow({});

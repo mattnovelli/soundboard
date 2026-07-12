@@ -21,6 +21,8 @@ var KEY_PCM_CHUNK = 4;
 var KEY_PCM_DONE = 5;
 var KEY_STATUS = 6;
 var KEY_VOLUME = 7;
+var KEY_SOUND_EMOJIS = 8;
+var KEY_GRID_MODE = 9;
 
 // TODO: set this to your published GitHub Pages URL (see docs/README.md).
 var CONFIG_PAGE_URL = 'https://mattnovelli.github.io/soundboard/';
@@ -40,16 +42,18 @@ function getSettings() {
     var s = JSON.parse(localStorage.getItem('sb_settings')) || {};
     return {
       volume: typeof s.volume === 'number' ? s.volume : 100,
+      gridMode: !!s.gridMode,
       sounds: Array.isArray(s.sounds) ? s.sounds : []
     };
   } catch (e) {
-    return { volume: 100, sounds: [] };
+    return { volume: 100, gridMode: false, sounds: [] };
   }
 }
 
 function saveSettings(s) {
   localStorage.setItem('sb_settings', JSON.stringify({
     volume: s.volume,
+    gridMode: !!s.gridMode,
     sounds: s.sounds
   }));
 }
@@ -70,22 +74,20 @@ function removePcm(id) {
   localStorage.removeItem('sb_pcm_' + id);
 }
 
-function soundDisplay(snd) {
-  var emoji = snd.emoji ? (snd.emoji + ' ') : '';
-  return emoji + (snd.name || 'Sound');
-}
-
 // ---------------------------------------------------------------------------
 // Sending the sound list to the watch
 // ---------------------------------------------------------------------------
 
 function sendSoundList() {
   var s = getSettings();
-  var names = s.sounds.map(soundDisplay).join('\n');
+  var names = s.sounds.map(function (x) { return x.name || 'Sound'; }).join('\n');
+  var emojis = s.sounds.map(function (x) { return x.emoji || ''; }).join('\n');
   var msg = {};
   msg[KEY_SOUND_NAMES] = names;
+  msg[KEY_SOUND_EMOJIS] = emojis;
   msg[KEY_SOUND_COUNT] = s.sounds.length;
   msg[KEY_VOLUME] = s.volume;
+  msg[KEY_GRID_MODE] = s.gridMode ? 1 : 0;
   Pebble.sendAppMessage(msg, function () {
     console.log('Sound list sent (' + s.sounds.length + ')');
   }, function (e) {
@@ -226,6 +228,7 @@ Pebble.addEventListener('showConfiguration', function () {
   // Pass metadata only (no PCM) to keep the URL small.
   var meta = {
     volume: s.volume,
+    gridMode: s.gridMode,
     sounds: s.sounds.map(function (x) {
       return { id: x.id, name: x.name, emoji: x.emoji };
     })
@@ -282,6 +285,7 @@ Pebble.addEventListener('webviewclosed', function (e) {
   }
 
   var volume = typeof incoming.volume === 'number' ? incoming.volume : existing.volume;
-  saveSettings({ volume: volume, sounds: cleanSounds });
+  var gridMode = typeof incoming.gridMode === 'boolean' ? incoming.gridMode : existing.gridMode;
+  saveSettings({ volume: volume, gridMode: gridMode, sounds: cleanSounds });
   sendSoundList();
 });
