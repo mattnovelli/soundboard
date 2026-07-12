@@ -271,6 +271,28 @@
       .hidden-file {
         display: none;
       }
+      /* Android WebView often ignores a display:none file input triggered by
+         JS .click(). Instead we overlay a real, full-size transparent input on
+         the Upload button so the user's tap lands on the input directly. */
+      .upload-btn {
+        position: relative;
+        overflow: hidden;
+      }
+      .upload-btn .file-input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        font-size: 0;
+      }
+      .upload-btn .upload-lbl {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        pointer-events: none;
+      }
       .sticky-actions {
         position: sticky;
         bottom: 0;
@@ -805,6 +827,23 @@
           };
         }
 
+        // Blob.arrayBuffer() is missing on some older Android WebViews.
+        function readArrayBuffer(blob) {
+          if (blob.arrayBuffer) {
+            return blob.arrayBuffer();
+          }
+          return new Promise(function (resolve, reject) {
+            var fr = new FileReader();
+            fr.onload = function () {
+              resolve(fr.result);
+            };
+            fr.onerror = function () {
+              reject(fr.error);
+            };
+            fr.readAsArrayBuffer(blob);
+          });
+        }
+
         function decodeArrayBuffer(row, arrayBuffer) {
           var ctx = getAudioCtx();
           ctx.decodeAudioData(
@@ -843,10 +882,12 @@
             "</div>",
             '<div class="audio-controls">',
             '  <div class="btn-row">',
-            '    <button type="button" class="btn accent upload-btn">Upload file</button>',
+            '    <label class="btn accent upload-btn">',
+            '      <input type="file" accept=".mp3,.wav,.m4a,.aac,.aiff,.aif,.caf,.ogg,.oga,.opus,.flac,.mp4,.3gp,audio/*" class="file-input" />',
+            '      <span class="upload-lbl"></span>',
+            "    </label>",
             '    <button type="button" class="btn accent-outline record-btn">Record</button>',
             "  </div>",
-            '  <input type="file" accept=".mp3,.wav,.m4a,.aac,.aiff,.aif,.caf,.ogg,.oga,.opus,.flac,.mp4,.3gp,audio/*" class="hidden-file" />',
             '  <div class="trim">',
             '    <div class="waveform-wrap">',
             '      <canvas class="waveform"></canvas>',
@@ -902,19 +943,13 @@
           }
 
           // Wiring.
-          var fileInput = el.querySelector(".hidden-file");
-          el.querySelector(".upload-btn").innerHTML = IC_UPLOAD + "Upload file";
+          var fileInput = el.querySelector(".file-input");
+          el.querySelector(".upload-lbl").innerHTML = IC_UPLOAD + "Upload file";
           el.querySelector(".record-btn").innerHTML = IC_REC + "Record";
-          el.querySelector(".upload-btn").addEventListener(
-            "click",
-            function () {
-              fileInput.click();
-            },
-          );
           fileInput.addEventListener("change", function () {
             var file = fileInput.files && fileInput.files[0];
             if (!file) return;
-            file.arrayBuffer().then(function (ab) {
+            readArrayBuffer(file).then(function (ab) {
               decodeArrayBuffer(row, ab);
             });
           });
@@ -984,7 +1019,7 @@
                 btn.classList.remove("recording");
                 activeRecorder = null;
                 var blob = new Blob(chunks);
-                blob.arrayBuffer().then(function (ab) {
+                readArrayBuffer(blob).then(function (ab) {
                   decodeArrayBuffer(row, ab);
                 });
               };
