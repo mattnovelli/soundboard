@@ -1,7 +1,7 @@
 {
   "name": "soundboard",
   "author": "matt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "keywords": ["pebble-app", "soundboard", "speaker"],
   "private": true,
   "dependencies": {},
@@ -24,7 +24,24 @@
       "dummy"
     ],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "type": "png",
+          "name": "MENU_ICON",
+          "file": "25x25.png",
+          "menuIcon": true
+        },
+        {
+          "type": "png",
+          "name": "50",
+          "file": "50x50.png"
+        },
+        {
+          "type": "png",
+          "name": "80",
+          "file": "80x80.png"
+        }
+      ]
     }
   }
 }
